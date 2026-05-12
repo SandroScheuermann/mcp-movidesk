@@ -51,6 +51,17 @@ After configuring OpenCode, ask for a numeric ticket ID, for example:
 Use Movidesk to get ticket 123456
 ```
 
+## Rate Limit
+
+Movidesk allows 10 API requests per minute. This server has a built-in guard that serializes outbound API requests and waits at least 6.1 seconds between them.
+
+Agent guidance:
+
+- Do not call the tools in bulk or in parallel.
+- Prefer one ticket lookup at a time.
+- Wait for each result before deciding whether another tool call is needed.
+- If Movidesk returns `429`, respect the returned `retryAfterSeconds` value.
+
 ## Security
 
 - The server only performs `GET` requests.

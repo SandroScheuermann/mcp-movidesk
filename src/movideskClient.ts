@@ -66,7 +66,7 @@ export class MovideskClient {
     });
 
     if (!result || typeof result !== "object") {
-      throw new MovideskApiError({ message: `Ticket ${ticketId} nao encontrado.` });
+      throw new MovideskApiError({ message: `Ticket ${ticketId} not found.` });
     }
 
     return result;
@@ -103,10 +103,10 @@ export class MovideskClient {
       }
 
       if (error instanceof DOMException && error.name === "AbortError") {
-        throw new MovideskApiError({ message: `Timeout ao consultar a API Movidesk apos ${this.timeoutMs}ms.` });
+        throw new MovideskApiError({ message: `Timed out while querying the Movidesk API after ${this.timeoutMs}ms.` });
       }
 
-      throw new MovideskApiError({ message: error instanceof Error ? error.message : "Erro desconhecido ao consultar a API Movidesk." });
+      throw new MovideskApiError({ message: error instanceof Error ? error.message : "Unknown error while querying the Movidesk API." });
     } finally {
       clearTimeout(timeout);
     }
@@ -140,8 +140,8 @@ async function toApiError(response: Response): Promise<MovideskApiError> {
   const retryAfter = response.headers.get("retry-after");
   await safeDrainBody(response);
   const message = retryAfter
-    ? `Movidesk retornou HTTP ${response.status}. Tente novamente apos ${retryAfter}s.`
-    : `Movidesk retornou HTTP ${response.status}.`;
+    ? `Movidesk returned HTTP ${response.status}. Try again after ${retryAfter}s.`
+    : `Movidesk returned HTTP ${response.status}.`;
 
   return new MovideskApiError({
     status: response.status,

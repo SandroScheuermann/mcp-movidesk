@@ -14,32 +14,37 @@ type ToolRegistrar = {
 };
 
 const TicketInputShape: { ticketId: z.ZodType<string> } = {
-  ticketId: z.string().trim().regex(/^\d{1,30}$/, "ticketId deve conter apenas numeros")
+  ticketId: z.string().trim().regex(/^\d{1,30}$/, "ticketId must contain only numbers")
 };
 
 const MAX_TEXT_LENGTH = 2_000;
 const MAX_ACTIONS = 40;
+const RATE_LIMIT_NOTICE = {
+  limit: "Movidesk API allows 10 requests per minute.",
+  guard: "This MCP server serializes outbound Movidesk API requests with at least 6.1 seconds between requests.",
+  agentGuidance: "Do not call these tools in bulk or in parallel. Prefer one ticket lookup at a time and wait for each result before deciding the next call."
+};
 
 export function registerTools(server: McpServer, client: MovideskClient): void {
   const registrar = server as ToolRegistrar;
 
   registrar.tool(
     "get_ticket",
-    "Consulta dados principais de um ticket Movidesk por ID. Ferramenta somente leitura.",
+    "Read-only lookup for main Movidesk ticket data by numeric ID. Rate limit: use one call at a time; the server waits between API requests.",
     TicketInputShape,
     async (input: TicketInput) => asToolResult(async () => summarizeTicket(await client.getTicket(input.ticketId)))
   );
 
   registrar.tool(
     "get_ticket_history",
-    "Consulta historico, comentarios, status e interacoes de um ticket Movidesk. Ferramenta somente leitura.",
+    "Read-only lookup for Movidesk ticket history, comments, statuses, and interactions. Rate limit: use one call at a time; avoid bulk history scans.",
     TicketInputShape,
     async (input: TicketInput) => asToolResult(async () => summarizeHistory(await client.getTicketHistory(input.ticketId)))
   );
 
   registrar.tool(
     "get_ticket_attachments",
-    "Lista anexos e imagens associados as acoes de um ticket Movidesk, incluindo metadados e URL de download sem token quando ha hash. Ferramenta somente leitura.",
+    "Read-only lookup for Movidesk ticket attachments, metadata, hashes, and tokenless download URLs. Rate limit: use one call at a time.",
     TicketInputShape,
     async (input: TicketInput) => asToolResult(async () => summarizeAttachments(await client.getTicketAttachments(input.ticketId), client))
   );
@@ -50,14 +55,14 @@ async function asToolResult(read: () => Promise<JsonObject>) {
     const data = await read();
 
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ ok: true, data }, null, 2) }]
+      content: [{ type: "text" as const, text: JSON.stringify({ ok: true, rateLimit: RATE_LIMIT_NOTICE, data }, null, 2) }]
     };
   } catch (error) {
     const data = formatError(error);
 
     return {
       isError: true,
-      content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error: data }, null, 2) }]
+      content: [{ type: "text" as const, text: JSON.stringify({ ok: false, rateLimit: RATE_LIMIT_NOTICE, error: data }, null, 2) }]
     };
   }
 }
@@ -88,7 +93,7 @@ function summarizeTicket(ticket: MovideskTicket): JsonObject {
     tags: ticket.tags,
     dates: cleanObject({ resolvedIn: ticket.resolvedIn, reopenedIn: ticket.reopenedIn, closedIn: ticket.closedIn }),
     recentActions: actions.slice(-5).map(summarizeAction),
-    note: actions.length > 5 ? `Retornadas as 5 acoes mais recentes de ${actions.length}. Use get_ticket_history para mais contexto.` : undefined
+    note: actions.length > 5 ? `Returned the 5 most recent actions out of ${actions.length}. Use get_ticket_history for more context, but avoid unnecessary calls because of the Movidesk rate limit.` : undefined
   });
 }
 
@@ -217,6 +222,6 @@ function formatError(error: unknown): JsonObject {
 
   return {
     type: "UnexpectedError",
-    message: error instanceof Error ? error.message : "Erro desconhecido."
+    message: error instanceof Error ? error.message : "Unknown error."
   };
 }
