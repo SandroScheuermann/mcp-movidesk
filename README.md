@@ -1,75 +1,23 @@
-# Movidesk MCP Server
+# mcp-movidesk
 
-Servidor MCP em TypeScript/Bun para consultar tickets do Movidesk em modo somente leitura.
+Read-only MCP server for querying Movidesk tickets through the public Movidesk API.
 
-## Ferramentas
+## Requirements
 
-- `get_ticket`: retorna dados principais do ticket e resumo das ultimas interacoes.
-- `get_ticket_history`: retorna historico, comentarios, status e interacoes do ticket.
-- `get_ticket_attachments`: retorna anexos/imagens associados ao ticket, com metadados, hash e URL de download sem token quando houver hash.
+- Bun installed.
+- A Movidesk API token.
 
-Nenhuma ferramenta cria, altera, exclui ou atualiza tickets.
+## OpenCode Configuration
 
-## Requisitos
+Add this server to your OpenCode configuration file.
 
-- Bun instalado.
-- Token da API Movidesk.
+On Windows, this is usually:
 
-## Instalacao
-
-```bash
-git clone <url-do-repositorio> mcp-movidesk
-cd mcp-movidesk
-bun install
+```text
+%USERPROFILE%\.opencode\opencode.json
 ```
 
-## Variaveis De Ambiente
-
-Crie um arquivo `.env` ou configure a variavel no ambiente do MCP client:
-
-```bash
-MOVIDESK_TOKEN=seu-token-da-api-movidesk
-```
-
-O token nao deve ser versionado ou escrito no codigo.
-
-Um arquivo `.env.example` esta incluido apenas como modelo.
-
-## Execucao
-
-```bash
-bun run src/index.ts
-```
-
-Ou pelo script:
-
-```bash
-bun run start
-```
-
-## Configuracao MCP Client
-
-Exemplo generico de configuracao para um cliente MCP via stdio:
-
-```json
-{
-  "mcpServers": {
-    "movidesk": {
-      "command": "bun",
-      "args": ["run", "C:/MCP Servers/Movidesk/src/index.ts"],
-      "env": {
-        "MOVIDESK_TOKEN": "seu-token-da-api-movidesk"
-      }
-    }
-  }
-}
-```
-
-## Configuracao OpenCode
-
-Adicione o servidor no arquivo de configuracao do OpenCode, normalmente em `%USERPROFILE%\.opencode\opencode.json` no Windows.
-
-Exemplo usando pacote publicado e `bunx`:
+Configuration:
 
 ```json
 {
@@ -78,84 +26,35 @@ Exemplo usando pacote publicado e `bunx`:
       "command": "bunx",
       "args": ["mcp-movidesk@latest"],
       "env": {
-        "MOVIDESK_TOKEN": "seu-token-da-api-movidesk"
+        "MOVIDESK_TOKEN": "your-movidesk-api-token"
       }
     }
   }
 }
 ```
 
-Exemplo usando o script `start` a partir de um repositorio clonado:
+Restart OpenCode after changing the configuration.
 
-```json
-{
-  "mcpServers": {
-    "movidesk": {
-      "command": "bun",
-      "args": ["run", "--cwd", "C:/caminho/para/mcp-movidesk", "start"],
-      "env": {
-        "MOVIDESK_TOKEN": "seu-token-da-api-movidesk"
-      }
-    }
-  }
-}
+## Tools
+
+- `get_ticket`: returns the main ticket data and a short summary of recent actions.
+- `get_ticket_history`: returns ticket history, comments, status changes, and interactions.
+- `get_ticket_attachments`: returns ticket attachment metadata, attachment hash, and a download URL without the token.
+
+All tools are read-only. They do not create, update, or delete Movidesk tickets.
+
+## Usage
+
+After configuring OpenCode, ask for a numeric ticket ID, for example:
+
+```text
+Use Movidesk to get ticket 123456
 ```
 
-Depois de alterar a configuracao, reinicie o OpenCode e teste pedindo uma consulta de ticket numerico.
+## Security
 
-## Publicacao
-
-Para publicar como pacote executavel e usar via `bunx`:
-
-```bash
-bun install
-bun run build
-npm publish
-```
-
-Depois de publicado, o OpenCode pode iniciar o MCP com `bunx mcp-movidesk@latest`.
-
-Antes de publicar, ajuste o `name` no `package.json` se quiser usar um pacote escopado, por exemplo `@sua-org/mcp-movidesk`. Nesse caso, a configuracao fica `"args": ["@sua-org/mcp-movidesk@latest"]`.
-
-Arquivos recomendados para versionar:
-
-- `bin/`
-- `scripts/`
-- `src/`
-- `package.json`
-- `bun.lock`
-- `tsconfig.json`
-- `README.md`
-- `.env.example`
-- `.gitignore`
-
-Nao versione `.env`, tokens, logs ou `node_modules/`.
-
-## API Movidesk Utilizada
-
-- Base URL: `https://api.movidesk.com/public/v1`
-- Ticket por ID: `GET /tickets?token=TOKEN&id=TICKET_ID`
-- Historico/interacoes: `GET /tickets` com `$expand=actions(...)`
-- Anexos do ticket: `actions($expand=attachments)`
-- Download de anexo: `GET /storage/download?token=TOKEN&id=HASH`; a ferramenta retorna apenas a URL sem `token` e o `hash`.
-
-Observacoes da documentacao Movidesk:
-
-- A rota `/tickets` cobre tickets com `lastUpdate` inferior a 90 dias; tickets antigos podem exigir `/tickets/past`.
-- A API possui limite de 10 requisicoes por minuto.
-- Em caso de bloqueio por falhas, a API pode retornar `429` e header `retry-after`.
-- O servidor serializa chamadas para respeitar aproximadamente 10 requisicoes por minuto.
-
-## Validacao
-
-```bash
-bun run typecheck
-```
-
-## Seguranca
-
-- O servidor usa apenas `GET`.
-- O token e lido exclusivamente de `MOVIDESK_TOKEN`.
-- URLs de anexo retornadas pelas ferramentas nao incluem token; use o hash retornado com credenciais fora do historico MCP quando precisar baixar o arquivo.
-- Logs sao minimos e nao exibem token.
-- Respostas grandes sao truncadas/resumidas antes de retornar ao agente.
+- The server only performs `GET` requests.
+- The Movidesk token is read from `MOVIDESK_TOKEN`.
+- Attachment URLs returned by the tool do not include the token.
+- Large responses are summarized or truncated before being returned to the MCP client.
+- Requests are serialized to stay close to the Movidesk limit of 10 requests per minute.
