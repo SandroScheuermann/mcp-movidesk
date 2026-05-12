@@ -1,6 +1,6 @@
 {
   "name": "mcp-movidesk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server read-only para consultar tickets do Movidesk.",
   "type": "module",
   "private": false,
