@@ -1,0 +1,30 @@
+{
+  "name": "movidesk-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server read-only para consultar tickets do Movidesk.",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "movidesk-mcp-server": "./bin/movidesk-mcp-server.js"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "README.md",
+    ".env.example"
+  ],
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "build": "tsc && bun run scripts/add-shebang.ts",
+    "prepack": "bun run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.13",
+    "typescript": "5.9.3"
+  }
+}
