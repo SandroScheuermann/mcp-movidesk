@@ -14,24 +14,28 @@ Add this server to your OpenCode configuration file.
 On Windows, this is usually:
 
 ```text
-%USERPROFILE%\.opencode\opencode.json
+%USERPROFILE%\.config\opencode\opencode.json
 ```
 
 Configuration:
 
 ```json
 {
-  "mcpServers": {
-    "movidesk": {
-      "command": "bunx",
-      "args": ["mcp-movidesk@latest"],
-      "env": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "mcp-movidesk": {
+      "type": "local",
+      "command": ["bunx", "mcp-movidesk@latest"],
+      "enabled": true,
+      "environment": {
         "MOVIDESK_TOKEN": "your-movidesk-api-token"
       }
     }
   }
 }
 ```
+
+OpenCode expects MCP servers under the `mcp` key. Do not use `mcpServers`, `args`, or `env` for this configuration format.
 
 Restart OpenCode after changing the configuration.
 
