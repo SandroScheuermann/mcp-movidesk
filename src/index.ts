@@ -11,7 +11,7 @@ if (!token) {
 }
 
 const server = new McpServer({
-  name: "movidesk-mcp-server",
+  name: "mcp-movidesk",
   version: "0.1.0"
 });
 

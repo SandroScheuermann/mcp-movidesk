@@ -1,4 +1,4 @@
-const entrypoint = "bin/movidesk-mcp-server.js";
+const entrypoint = "bin/mcp-movidesk.js";
 const contents = await Bun.file(entrypoint).text();
 
 if (!contents.startsWith("#!/usr/bin/env node")) {

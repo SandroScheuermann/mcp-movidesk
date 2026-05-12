@@ -18,8 +18,8 @@ Nenhuma ferramenta cria, altera, exclui ou atualiza tickets.
 ## Instalacao
 
 ```bash
-git clone <url-do-repositorio> movidesk-mcp-server
-cd movidesk-mcp-server
+git clone <url-do-repositorio> mcp-movidesk
+cd mcp-movidesk
 bun install
 ```
 
@@ -76,7 +76,7 @@ Exemplo usando pacote publicado e `bunx`:
   "mcpServers": {
     "movidesk": {
       "command": "bunx",
-      "args": ["movidesk-mcp-server@latest"],
+      "args": ["mcp-movidesk@latest"],
       "env": {
         "MOVIDESK_TOKEN": "seu-token-da-api-movidesk"
       }
@@ -92,7 +92,7 @@ Exemplo usando o script `start` a partir de um repositorio clonado:
   "mcpServers": {
     "movidesk": {
       "command": "bun",
-      "args": ["run", "--cwd", "C:/caminho/para/movidesk-mcp-server", "start"],
+      "args": ["run", "--cwd", "C:/caminho/para/mcp-movidesk", "start"],
       "env": {
         "MOVIDESK_TOKEN": "seu-token-da-api-movidesk"
       }
@@ -113,9 +113,9 @@ bun run build
 npm publish
 ```
 
-Depois de publicado, o OpenCode pode iniciar o MCP com `bunx movidesk-mcp-server@latest`.
+Depois de publicado, o OpenCode pode iniciar o MCP com `bunx mcp-movidesk@latest`.
 
-Antes de publicar, ajuste o `name` no `package.json` se quiser usar um pacote escopado, por exemplo `@sua-org/movidesk-mcp-server`. Nesse caso, a configuracao fica `"args": ["@sua-org/movidesk-mcp-server@latest"]`.
+Antes de publicar, ajuste o `name` no `package.json` se quiser usar um pacote escopado, por exemplo `@sua-org/mcp-movidesk`. Nesse caso, a configuracao fica `"args": ["@sua-org/mcp-movidesk@latest"]`.
 
 Arquivos recomendados para versionar:
 
