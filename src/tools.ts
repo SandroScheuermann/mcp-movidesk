@@ -32,19 +32,19 @@ export function registerTools(server: McpServer, client: MovideskClient): void {
     "get_ticket",
     "Read-only lookup for main Movidesk ticket data by numeric ID. Rate limit: use one call at a time; the server waits between API requests.",
     TicketInputShape,
-    async (input: TicketInput) => asToolResult(async () => summarizeTicket(await client.getTicket(input.ticketId)))
+    async (input: TicketInput) => asToolResult(async () => summarizeTicket(await client.getTicket(input.ticketId), client))
   );
 
   registrar.tool(
     "get_ticket_history",
-    "Read-only lookup for Movidesk ticket history, comments, statuses, and interactions. Rate limit: use one call at a time; avoid bulk history scans.",
+    "Read-only lookup for Movidesk ticket history, comments, inline comment images, statuses, and interactions. Rate limit: use one call at a time; avoid bulk history scans.",
     TicketInputShape,
-    async (input: TicketInput) => asToolResult(async () => summarizeHistory(await client.getTicketHistory(input.ticketId)))
+    async (input: TicketInput) => asToolResult(async () => summarizeHistory(await client.getTicketHistory(input.ticketId), client))
   );
 
   registrar.tool(
     "get_ticket_attachments",
-    "Read-only lookup for Movidesk ticket attachments, metadata, hashes, and tokenless download URLs. Rate limit: use one call at a time.",
+    "Read-only lookup for Movidesk ticket attachments and inline comment images, with metadata, hashes, and tokenless download URLs. Rate limit: use one call at a time.",
     TicketInputShape,
     async (input: TicketInput) => asToolResult(async () => summarizeAttachments(await client.getTicketAttachments(input.ticketId), client))
   );
@@ -67,7 +67,7 @@ async function asToolResult(read: () => Promise<JsonObject>) {
   }
 }
 
-function summarizeTicket(ticket: MovideskTicket): JsonObject {
+function summarizeTicket(ticket: MovideskTicket, client: MovideskClient): JsonObject {
   const actions = Array.isArray(ticket.actions) ? ticket.actions : [];
 
   return cleanObject({
@@ -92,12 +92,12 @@ function summarizeTicket(ticket: MovideskTicket): JsonObject {
     serviceFull: ticket.serviceFull,
     tags: ticket.tags,
     dates: cleanObject({ resolvedIn: ticket.resolvedIn, reopenedIn: ticket.reopenedIn, closedIn: ticket.closedIn }),
-    recentActions: actions.slice(-5).map(summarizeAction),
+    recentActions: actions.slice(-5).map((action) => summarizeAction(action, client)),
     note: actions.length > 5 ? `Returned the 5 most recent actions out of ${actions.length}. Use get_ticket_history for more context, but avoid unnecessary calls because of the Movidesk rate limit.` : undefined
   });
 }
 
-function summarizeHistory(ticket: MovideskTicket): JsonObject {
+function summarizeHistory(ticket: MovideskTicket, client: MovideskClient): JsonObject {
   const actions = Array.isArray(ticket.actions) ? ticket.actions : [];
   const visibleActions = actions.slice(-MAX_ACTIONS);
 
@@ -108,7 +108,7 @@ function summarizeHistory(ticket: MovideskTicket): JsonObject {
     totalActions: actions.length,
     returnedActions: visibleActions.length,
     truncated: actions.length > visibleActions.length,
-    actions: visibleActions.map(summarizeAction)
+    actions: visibleActions.map((action) => summarizeAction(action, client))
   });
 }
 
@@ -117,16 +117,21 @@ function summarizeAttachments(ticket: MovideskTicket, client: MovideskClient): J
   const attachments = actions.flatMap((action) =>
     (action.attachments ?? []).map((attachment) => summarizeAttachment(attachment, action, client))
   );
+  const inlineImages = actions.flatMap((action) => summarizeActionInlineImages(action, client));
 
   return cleanObject({
     ticketId: ticket.id,
     subject: truncate(ticket.subject),
     totalAttachments: attachments.length,
-    attachments
+    totalInlineImages: inlineImages.length,
+    attachments,
+    inlineImages
   });
 }
 
-function summarizeAction(action: MovideskAction): JsonObject {
+function summarizeAction(action: MovideskAction, client: MovideskClient): JsonObject {
+  const inlineImages = extractInlineImages(action.htmlDescription ?? action.description ?? "", client);
+
   return cleanObject({
     id: action.id,
     type: action.type,
@@ -143,8 +148,21 @@ function summarizeAction(action: MovideskAction): JsonObject {
       path: attachment.path,
       createdDate: attachment.createdDate
     })),
+    inlineImageCount: inlineImages.length,
+    inlineImages: inlineImages.length > 0 ? inlineImages : undefined,
     tags: action.tags
   });
+}
+
+function summarizeActionInlineImages(action: MovideskAction, client: MovideskClient): JsonObject[] {
+  return extractInlineImages(action.htmlDescription ?? action.description ?? "", client).map((image) =>
+    cleanObject({
+      ...image,
+      actionId: action.id,
+      actionCreatedDate: action.createdDate,
+      actionCreatedBy: summarizePerson(action.createdBy)
+    })
+  );
 }
 
 function summarizeAttachment(attachment: MovideskAttachment, action: MovideskAction, client: MovideskClient): JsonObject {
@@ -161,6 +179,87 @@ function summarizeAttachment(attachment: MovideskAttachment, action: MovideskAct
     actionCreatedDate: action.createdDate,
     actionCreatedBy: summarizePerson(action.createdBy)
   });
+}
+
+function extractInlineImages(html: string, client: MovideskClient): JsonObject[] {
+  const images: JsonObject[] = [];
+
+  for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = match[0];
+    const src = readHtmlAttribute(tag, "src") ?? readHtmlAttribute(tag, "data-src");
+
+    if (!src) {
+      continue;
+    }
+
+    const hash = extractStorageHash(src);
+    const sourceUrl = sanitizeImageSourceUrl(src);
+    const embeddedData = src.trim().toLowerCase().startsWith("data:");
+
+    images.push(cleanObject({
+      hash,
+      downloadUrl: hash ? client.getAttachmentDownloadUrl(hash) : undefined,
+      sourceUrl: hash ? undefined : sourceUrl,
+      downloadRequiresToken: hash ? true : undefined,
+      embeddedData: embeddedData ? true : undefined,
+      mimeType: embeddedData ? extractDataImageMimeType(src) : undefined,
+      alt: readHtmlAttribute(tag, "alt"),
+      title: readHtmlAttribute(tag, "title")
+    }));
+  }
+
+  return images;
+}
+
+function readHtmlAttribute(tag: string, attribute: string): string | undefined {
+  const match = tag.match(new RegExp(`\\s${attribute}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'<>]+))`, "i"));
+  const value = match?.[1] ?? match?.[2] ?? match?.[3];
+
+  return value ? decodeHtml(value).trim() : undefined;
+}
+
+function extractStorageHash(src: string): string | undefined {
+  const normalized = src.trim();
+
+  try {
+    const url = new URL(normalized, "https://api.movidesk.com");
+    const hash = url.searchParams.get("id") ?? url.searchParams.get("hash") ?? url.searchParams.get("path");
+
+    if (hash?.trim()) {
+      return hash.trim();
+    }
+  } catch {
+    // Fall back to regex extraction below.
+  }
+
+  const queryMatch = normalized.match(/[?&](?:id|hash|path)=([^&#]+)/i);
+  const pathMatch = normalized.match(/\/storage\/download\/([^/?#]+)/i);
+  const hash = queryMatch?.[1] ?? pathMatch?.[1];
+
+  return hash ? decodeURIComponent(hash).trim() : undefined;
+}
+
+function sanitizeImageSourceUrl(src: string): string | undefined {
+  const normalized = src.trim();
+
+  if (!normalized || normalized.toLowerCase().startsWith("data:")) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(normalized, "https://api.movidesk.com");
+    url.searchParams.delete("token");
+
+    return /^[a-z][a-z\d+.-]*:/i.test(normalized) ? url.toString() : `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return normalized.replace(/([?&])token=[^&#]*&?/i, "$1").replace(/[?&]$/, "");
+  }
+}
+
+function extractDataImageMimeType(src: string): string | undefined {
+  const match = src.match(/^data:([^;,]+)[;,]/i);
+
+  return match?.[1];
 }
 
 function summarizePerson(person: unknown): JsonObject | undefined {
@@ -194,9 +293,13 @@ function truncate(value: unknown): string | undefined {
 }
 
 function stripHtml(value: string): string {
-  return value
+  return decodeHtml(value
     .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/gi, " ")
+    .replace(/&nbsp;/gi, " "));
+}
+
+function decodeHtml(value: string): string {
+  return value
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")

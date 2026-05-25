@@ -131,7 +131,7 @@ function historyExpand(): string {
 
 function attachmentsExpand(): string {
   return [
-    "actions($select=id,createdDate,createdBy)",
+    "actions($select=id,createdDate,createdBy,description,htmlDescription)",
     "actions($expand=attachments)"
   ].join(",");
 }

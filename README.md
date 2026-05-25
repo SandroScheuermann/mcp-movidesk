@@ -42,8 +42,8 @@ Restart OpenCode after changing the configuration.
 ## Tools
 
 - `get_ticket`: returns the main ticket data and a short summary of recent actions.
-- `get_ticket_history`: returns ticket history, comments, status changes, and interactions.
-- `get_ticket_attachments`: returns ticket attachment metadata, attachment hash, and a download URL without the token.
+- `get_ticket_history`: returns ticket history, comments, inline comment images, status changes, and interactions.
+- `get_ticket_attachments`: returns ticket attachment metadata plus inline comment images, hashes, and download URLs without the token.
 
 All tools are read-only. They do not create, update, or delete Movidesk tickets.
 
