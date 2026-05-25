@@ -5,7 +5,7 @@
   "type": "module",
   "private": false,
   "bin": {
-    "mcp-movidesk": "./bin/mcp-movidesk.js"
+    "mcp-movidesk": "bin/mcp-movidesk.js"
   },
   "files": [
     "bin/",
