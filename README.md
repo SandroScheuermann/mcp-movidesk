@@ -44,6 +44,7 @@ Restart OpenCode after changing the configuration.
 - `get_ticket`: returns the main ticket data and a short summary of recent actions.
 - `get_ticket_history`: returns ticket history, comments, inline comment images, status changes, and interactions.
 - `get_ticket_attachments`: returns ticket attachment metadata plus inline comment images, hashes, and download URLs without the token.
+- `get_ticket_inline_image`: downloads one inline comment image by storage hash using the server-side Movidesk token and returns image content without exposing the token.
 
 All tools are read-only. They do not create, update, or delete Movidesk tickets.
 
@@ -71,5 +72,6 @@ Agent guidance:
 - The server only performs `GET` requests.
 - The Movidesk token is read from `MOVIDESK_TOKEN`.
 - Attachment URLs returned by the tool do not include the token.
+- Inline image downloads use the server-side token internally and do not expose it in responses.
 - Large responses are summarized or truncated before being returned to the MCP client.
 - Requests are serialized to stay close to the Movidesk limit of 10 requests per minute.

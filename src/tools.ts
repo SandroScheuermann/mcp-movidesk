@@ -4,17 +4,23 @@ import { MovideskApiError, MovideskClient } from "./movideskClient.js";
 import type { JsonObject, MovideskAction, MovideskAttachment, MovideskTicket } from "./types.js";
 
 type TicketInput = { ticketId: string };
+type ImageInput = { hash: string };
+type ToolContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 type ToolRegistrar = {
-  tool(
+  tool<TArgs>(
     name: string,
     description: string,
-    paramsSchema: typeof TicketInputShape,
-    cb: (args: TicketInput) => Promise<{ isError?: boolean; content: { type: "text"; text: string }[] }>
+    paramsSchema: Record<string, z.ZodTypeAny>,
+    cb: (args: TArgs) => Promise<{ isError?: boolean; content: ToolContent[] }>
   ): unknown;
 };
 
 const TicketInputShape: { ticketId: z.ZodType<string> } = {
   ticketId: z.string().trim().regex(/^\d{1,30}$/, "ticketId must contain only numbers")
+};
+
+const ImageInputShape: { hash: z.ZodType<string> } = {
+  hash: z.string().trim().regex(/^[A-Za-z0-9._-]{1,200}$/, "hash must be a Movidesk storage identifier")
 };
 
 const MAX_TEXT_LENGTH = 2_000;
@@ -48,6 +54,13 @@ export function registerTools(server: McpServer, client: MovideskClient): void {
     TicketInputShape,
     async (input: TicketInput) => asToolResult(async () => summarizeAttachments(await client.getTicketAttachments(input.ticketId), client))
   );
+
+  registrar.tool(
+    "get_ticket_inline_image",
+    "Read-only download for a Movidesk inline comment image by storage hash. Uses the server-side Movidesk token and returns image content without exposing the token. Rate limit: use one call at a time.",
+    ImageInputShape,
+    async (input: ImageInput) => asImageToolResult(async () => client.downloadStorageFile(input.hash))
+  );
 }
 
 async function asToolResult(read: () => Promise<JsonObject>) {
@@ -56,6 +69,26 @@ async function asToolResult(read: () => Promise<JsonObject>) {
 
     return {
       content: [{ type: "text" as const, text: JSON.stringify({ ok: true, rateLimit: RATE_LIMIT_NOTICE, data }, null, 2) }]
+    };
+  } catch (error) {
+    const data = formatError(error);
+
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: JSON.stringify({ ok: false, rateLimit: RATE_LIMIT_NOTICE, error: data }, null, 2) }]
+    };
+  }
+}
+
+async function asImageToolResult(read: () => Promise<{ data: string; mimeType: string; size: number }>) {
+  try {
+    const image = await read();
+
+    return {
+      content: [
+        { type: "image" as const, data: image.data, mimeType: image.mimeType },
+        { type: "text" as const, text: JSON.stringify({ ok: true, rateLimit: RATE_LIMIT_NOTICE, data: { mimeType: image.mimeType, size: image.size } }, null, 2) }
+      ]
     };
   } catch (error) {
     const data = formatError(error);

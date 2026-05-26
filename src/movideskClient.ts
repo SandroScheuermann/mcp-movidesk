@@ -1,4 +1,4 @@
-import type { ApiErrorDetails, MovideskTicket } from "./types.js";
+import type { ApiErrorDetails, MovideskDownloadedFile, MovideskTicket } from "./types.js";
 
 const DEFAULT_BASE_URL = "https://api.movidesk.com/public/v1";
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -45,6 +45,49 @@ export class MovideskClient {
     const url = new URL(`${this.baseUrl}/storage/download`);
     url.searchParams.set("id", hash);
     return url.toString();
+  }
+
+  async downloadStorageFile(hash: string): Promise<MovideskDownloadedFile> {
+    await waitForRateLimit();
+
+    const url = new URL(`${this.baseUrl}/storage/download`);
+    url.searchParams.set("token", this.token);
+    url.searchParams.set("id", hash);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "image/*,*/*" },
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw await toApiError(response);
+      }
+
+      const bytes = await response.arrayBuffer();
+
+      return {
+        data: Buffer.from(bytes).toString("base64"),
+        mimeType: response.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream",
+        size: bytes.byteLength
+      };
+    } catch (error) {
+      if (error instanceof MovideskApiError) {
+        throw error;
+      }
+
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new MovideskApiError({ message: `Timed out while downloading a Movidesk storage file after ${this.timeoutMs}ms.` });
+      }
+
+      throw new MovideskApiError({ message: error instanceof Error ? error.message : "Unknown error while downloading a Movidesk storage file." });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private async getTicketWithFallback(ticketId: string, expand: string): Promise<MovideskTicket> {

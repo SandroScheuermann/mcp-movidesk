@@ -16,6 +16,12 @@ export type MovideskAttachment = {
   createdDate?: string;
 };
 
+export type MovideskDownloadedFile = {
+  data: string;
+  mimeType: string;
+  size: number;
+};
+
 export type MovideskAction = {
   id?: number;
   type?: number;
