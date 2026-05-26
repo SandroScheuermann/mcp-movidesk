@@ -233,7 +233,7 @@ function extractStorageHash(src: string): string | undefined {
   }
 
   const queryMatch = normalized.match(/[?&](?:id|hash|path)=([^&#]+)/i);
-  const pathMatch = normalized.match(/\/storage\/download\/([^/?#]+)/i);
+  const pathMatch = normalized.match(/\/(?:storage\/download|movidesk-files)\/([^/?#]+)/i);
   const hash = queryMatch?.[1] ?? pathMatch?.[1];
 
   return hash ? decodeURIComponent(hash).trim() : undefined;
